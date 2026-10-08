@@ -1,4 +1,9 @@
 import os
+import sys
+
+# Ensure Windows terminal can print emojis (like in playlist names) without crashing
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
 import asyncio
 import queue
 import re
@@ -12,22 +17,28 @@ import sounddevice as sd
 import soundfile as sf
 import numpy as np
 import time
+import difflib
 from faster_whisper import WhisperModel
 from ddgs import DDGS
 from datetime import datetime
 import ollama
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+import spotify_tools
+import youtube_tools
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # ==========================================
+# VERIFY API PERMISSIONS
+# ==========================================
+spotify_tools.init_spotify()
+
+# ==========================================
 # INITIALIZE MODELS
 # ==========================================
 print("Loading Whisper STT...")
-# Upgraded from base.en to medium.en for significantly better transcription accuracy
-whisper_model = WhisperModel("medium.en", device="cuda", compute_type="int8_float16")
+# Upgraded to large-v3 for maximum transcription accuracy (especially for foreign names)
+whisper_model = WhisperModel("large-v3", device="cuda", compute_type="int8_float16")
 
 print("Loading Silero TTS...")
 tts_model, _ = torch.hub.load(repo_or_dir='snakers4/silero-models', model='silero_tts', language='en', speaker='v3_en')
@@ -81,52 +92,7 @@ def control_media(command: str) -> str:
         return "Successfully resumed playing."
     return "Unknown command."
 
-def play_spotify_music(query: str, search_type: str = "track") -> str:
-    """Searches Spotify for a track or playlist and plays it."""
-    try:
-        sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope="user-modify-playback-state user-read-playback-state"))
-        
-        # Check active devices
-        devices = sp.devices()
-        if not devices.get('devices'):
-            import os
-            import time
-            os.system("start spotify:")
-            time.sleep(1)
-            devices = sp.devices()
-            if not devices.get('devices'):
-                return "Could not find an active Spotify device. Please open Spotify manually first."
-                
-        # Find active or first device
-        device_id = None
-        for d in devices['devices']:
-            if d['is_active']:
-                device_id = d['id']
-                break
-        if not device_id and devices['devices']:
-            device_id = devices['devices'][0]['id']
 
-        if search_type == "playlist":
-            results = sp.search(q=query, type='playlist', limit=1)
-            if results['playlists']['items']:
-                playlist_uri = results['playlists']['items'][0]['uri']
-                playlist_name = results['playlists']['items'][0]['name']
-                sp.start_playback(device_id=device_id, context_uri=playlist_uri)
-                return f"Successfully started playing the playlist: {playlist_name}."
-            else:
-                return f"Could not find any playlist matching '{query}'."
-        else:
-            results = sp.search(q=query, type='track', limit=1)
-            if results['tracks']['items']:
-                track_uri = results['tracks']['items'][0]['uri']
-                track_name = results['tracks']['items'][0]['name']
-                artist_name = results['tracks']['items'][0]['artists'][0]['name']
-                sp.start_playback(device_id=device_id, uris=[track_uri])
-                return f"Successfully started playing {track_name} by {artist_name}."
-            else:
-                return f"Could not find any song matching '{query}'."
-    except Exception as e:
-        return f"Spotify API Error: {str(e)}"
 
 def search_web(query: str) -> str:
     """Searches the internet with automatic retries for rate limits."""
@@ -162,7 +128,7 @@ web_search_schema = {
             "properties": {
                 "query": {
                     "type": "string", 
-                    "description": "The exact search engine query. MUST be highly specific. For newest releases, do NOT search 'latest [game] agent'. Instead, search 'all [game] agents release order [year]' or 'newest [game] agent announced patch [year]'. Avoid generic terms to bypass SEO tier lists."
+                    "description": "The exact search engine query. MUST be highly specific to get the best results. Avoid overly generic terms."
                 }
             },
             "required": ["query"]
@@ -189,34 +155,15 @@ media_control_schema = {
     }
 }
 
-play_spotify_schema = {
-    "type": "function",
-    "function": {
-        "name": "play_spotify_music",
-        "description": "Searches Spotify and plays a specific song or playlist. ONLY use this when the user names a specific song or playlist to play (e.g., 'Play the song Shape of You' or 'Play my Workout playlist').",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string", 
-                    "description": "The search query. CRITICAL: For songs, you MUST use Spotify's advanced search syntax like this: 'track:SongName artist:ArtistName' if the artist is known, or just 'track:SongName'. DO NOT just type 'Song by Artist' as it will return bad covers. For playlists, just output the playlist name normally without prefixes."
-                },
-                "search_type": {
-                    "type": "string", 
-                    "enum": ["track", "playlist"],
-                    "description": "Whether to search for a 'track' or a 'playlist'."
-                }
-            },
-            "required": ["query", "search_type"]
-        }
-    }
-}
-
 # The Dynamic Router: Maps the schema name to the actual Python function
 available_tools = {
     "search_web": search_web,
     "control_media": control_media,
-    "play_spotify_music": play_spotify_music
+    "play_spotify_music": spotify_tools.play_spotify_music,
+    "list_my_playlists": spotify_tools.list_my_playlists,
+    "what_is_playing": spotify_tools.what_is_playing,
+    "like_current_song": spotify_tools.like_current_song,
+    "search_youtube": youtube_tools.search_youtube
 }
 
 # ==========================================
@@ -304,8 +251,8 @@ async def think(user_text: str):
             "CRITICAL TTS RULE: You MUST spell out ALL numbers, decimals, and dates as words (e.g., write 'twenty twenty-six' instead of '2026', 'thirteen point zero six' instead of '13.06', 'thirty' instead of '30') because the text-to-speech engine cannot read numerical digits. "
             "CRITICAL RULE: You have outdated training data. You MUST ALWAYS use the search_web tool "
             "when asked about the 'latest', 'newest', 'current' events, or recent game updates. "
-            "HOWEVER, DO NOT use the search tool for basic conversation, greetings, or questions about your own status (e.g., 'can you hear me?', 'how are you?'). Just reply directly."
-            "Do not guess or rely on your internal memory for recent releases."
+            "CRITICAL RULE: If the user asks to play music, control media, search YouTube, or list their playlists, you MUST use the provided tools. DO NOT hallucinate or make up playlists/songs. "
+            "HOWEVER, DO NOT use any tools for basic conversation, greetings, or questions about your own status (e.g., 'can you hear me?', 'how are you?'). Just reply directly."
         )
     }]
     
@@ -319,12 +266,20 @@ async def think(user_text: str):
     
     # Determine if we should allow web searches for this query
     # If the user is just making basic conversation, we drop the tool to prevent hallucinating a search
-    conversational_keywords = ["can you hear", "are you there", "hello", "hi ", "hey ", "how are you", "who are you", "goodbye", "stop"]
+    conversational_keywords = ["can you hear", "are you there", "hello", "hi ", "hey ", "how are you", "who are you", "goodbye", "stop", "yo ", "whats up", "what's up", "sup"]
     text_lower = user_text.lower()
     
     # If it's a short sentence and contains a greeting/status check, don't pass the tool
     is_conversational = len(text_lower.split()) <= 6 and any(k in text_lower for k in conversational_keywords)
-    tools_to_use = [] if is_conversational else [web_search_schema, media_control_schema, play_spotify_schema]
+    tools_to_use = [] if is_conversational else [
+        web_search_schema, 
+        media_control_schema, 
+        spotify_tools.play_spotify_schema, 
+        spotify_tools.list_playlists_schema,
+        spotify_tools.what_is_playing_schema,
+        spotify_tools.like_song_schema,
+        youtube_tools.search_youtube_schema
+    ]
 
     response = await client.chat(
         model="llama3.1", 
@@ -344,14 +299,19 @@ async def think(user_text: str):
         
         if func_name in available_tools:
             tool_function = available_tools[func_name]
-            tool_result = tool_function(**args)
+            try:
+                tool_result = tool_function(**args)
+            except TypeError as e:
+                tool_result = f"Tool Execution Error: You passed invalid arguments to the function. Details: {e}"
+            except Exception as e:
+                tool_result = f"Tool Execution Error: {e}"
             
             messages.append(message)
             messages.append({"role": "tool", "content": tool_result})
             length_rule = "Provide a comprehensive, detailed, multi-sentence explanation." if any(word in user_text.lower() for word in ['detail', 'long', 'explain', 'everything', 'more']) else "Keep your answer extremely concise (1-2 sentences maximum)."
             
             if func_name == "search_web":
-                synthesis_prompt = f"You now have the search results. Synthesize a natural, conversational spoken answer. CRITICAL LENGTH RULE: {length_rule} WARNING: Ignore 'Tier Lists' or 'Win Rates' when looking for release dates, as they often incorrectly highlight older popular agents like Neon. Look for explicit mentions of new patches, agent numbers (like Agent 30), or chronological release orders."
+                synthesis_prompt = f"You now have the search results. Synthesize a natural, conversational spoken answer. CRITICAL LENGTH RULE: {length_rule} Only state the facts found in the sources provided."
             else:
                 synthesis_prompt = f"You have executed the tool and received the result. Synthesize a very short, natural confirmation. Do not explain what you did, just confirm it naturally."
                 
@@ -373,7 +333,7 @@ async def think(user_text: str):
         final_spoken_text = message.get('content', '')
 
     # Strip any accidental 'assistant' prefix that the model might generate
-    final_spoken_text = re.sub(r'^(?i)assistant[:\s]*\n*', '', final_spoken_text.strip())
+    final_spoken_text = re.sub(r'(?i)^assistant[:\s]*\n*', '', final_spoken_text.strip())
 
     # Ensure all digits are spelled out for the TTS
     digit_map = {'0': 'zero', '1': 'one', '2': 'two', '3': 'three', '4': 'four', '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine'}
@@ -450,7 +410,7 @@ def speak(text: str, speaker_id='en_99'):
 # THE MASTER LOOP
 # ==========================================
 async def main_loop():
-    wake_word = "cat"
+    wake_word = "bob"
     sleep_command = "stop"
     timeout_seconds = 30  # Go back to sleep after 30 seconds of silence
     is_awake = False
