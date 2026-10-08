@@ -171,6 +171,17 @@ public partial class MainViewModel : ViewModelBase
                         var newWord = line.Substring(21).Trim();
                         Dispatcher.UIThread.Post(() => WakeWord = newWord);
                     }
+                    else if (line.StartsWith("UI_PROMPT_NAME"))
+                    {
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            if (App.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+                            {
+                                var window = new NameWindow();
+                                window.ShowDialog(desktop.MainWindow);
+                            }
+                        });
+                    }
                     else if (line.StartsWith("Assistant:"))
                     {
                         var text = line.Substring(10).Trim();

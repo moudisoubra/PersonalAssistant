@@ -73,12 +73,12 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Change Wake Word -->
+                <!-- Identity & Memory -->
                 <Border Background="#22000000" CornerRadius="10" Padding="15">
                     <StackPanel>
                         <TextBlock Text="🧠 Identity &amp; Memory" FontWeight="Bold" FontSize="18" Foreground="#00FF7F" Margin="0,0,0,5"/>
-                        <TextBlock Text="You can rename me whenever you want, and I will remember it forever." TextWrapping="Wrap" Foreground="#CCCCCC" Margin="0,0,0,5"/>
-                        <TextBlock Text="Example: &quot;Change your wake word to Victoria&quot; or &quot;I want to call you Jarvis now.&quot;" FontStyle="Italic" TextWrapping="Wrap" Foreground="#888888"/>
+                        <TextBlock Text="You can rename me or teach me your name, and I will remember it forever." TextWrapping="Wrap" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                        <TextBlock Text="Example: &quot;Change your wake word to Victoria&quot; or &quot;Change my name&quot;" FontStyle="Italic" TextWrapping="Wrap" Foreground="#888888"/>
                     </StackPanel>
                 </Border>
 

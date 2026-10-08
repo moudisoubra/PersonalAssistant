@@ -164,8 +164,7 @@ available_tools = {
     "list_my_playlists": spotify_tools.list_my_playlists,
     "what_is_playing": spotify_tools.what_is_playing,
     "like_current_song": spotify_tools.like_current_song,
-    "search_youtube": youtube_tools.search_youtube,
-    "change_wake_word": None # Will be mapped below
+    "search_youtube": youtube_tools.search_youtube
 }
 
 # ==========================================
@@ -190,26 +189,6 @@ def change_wake_word(new_wake_word: str) -> str:
     save_memory(mem)
     print(f"UI_WAKE_WORD_CHANGED:{new_wake_word.upper()}")
     return f"Successfully changed wake word to {new_wake_word}."
-
-available_tools["change_wake_word"] = change_wake_word
-
-change_wake_word_schema = {
-    "type": "function",
-    "function": {
-        "name": "change_wake_word",
-        "description": "Change the name or wake keyword that the user uses to wake you up. Use this when the user says something like 'change your name to X' or 'I want to call you X'.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "new_wake_word": {
-                    "type": "string", 
-                    "description": "The new name or wake word the user wants to use."
-                }
-            },
-            "required": ["new_wake_word"]
-        }
-    }
-}
 
 # ==========================================
 # CORE FUNCTIONS
@@ -247,6 +226,16 @@ def listen_auto(fs=16000, threshold=600, silence_duration=2.5):
         while True:
             # Pull the next perfect chunk of audio from the queue
             chunk = audio_queue.get()
+            
+            # Check for instant commands from UI
+            if os.path.exists("command.txt"):
+                try:
+                    with open("command.txt", "r") as f:
+                        cmd = f.read().strip()
+                    os.remove("command.txt")
+                    return f"COMMAND:{cmd}"
+                except:
+                    pass
             
             # Check for MUTE state
             state = get_shared_state()
@@ -302,6 +291,8 @@ async def think(user_text: str):
     global conversation_history
     client = ollama.AsyncClient()
     wake_word = get_memory().get("wake_word", "bob")
+    user_name = get_memory().get("user_name", "")
+    name_prompt = f" The user's name is {user_name}. Use it naturally sometimes, but not every single time." if user_name else ""
     
 # Build the fresh context with Time Awareness and Strict Search Rules
     current_date = datetime.now().strftime("%B %d, %Y")
@@ -309,7 +300,7 @@ async def think(user_text: str):
     messages = [{
         "role": "system", 
         "content": (
-            f"You are a highly intelligent conversational voice assistant named {wake_word.capitalize()}. Today's date is {current_date}. "
+            f"You are a highly intelligent conversational voice assistant named {wake_word.capitalize()}. Today's date is {current_date}.{name_prompt} "
             "Provide clear, natural-sounding spoken responses. Adapt your response length based on the user's prompt. "
             "CRITICAL TTS RULE: You MUST spell out ALL numbers, decimals, and dates as words (e.g., write 'twenty twenty-six' instead of '2026', 'thirteen point zero six' instead of '13.06', 'thirty' instead of '30') because the text-to-speech engine cannot read numerical digits. "
             "CRITICAL RULE: You have outdated training data. You MUST ALWAYS use the search_web tool "
@@ -341,8 +332,7 @@ async def think(user_text: str):
         spotify_tools.list_playlists_schema,
         spotify_tools.what_is_playing_schema,
         spotify_tools.like_song_schema,
-        youtube_tools.search_youtube_schema,
-        change_wake_word_schema
+        youtube_tools.search_youtube_schema
     ]
 
     response = await client.chat(
@@ -421,8 +411,9 @@ async def think(user_text: str):
             
     return final_spoken_text
 
-def speak(text: str, speaker_id='en_99'): 
-    print(f"Assistant: {text}")
+def speak(text: str, speaker_id='en_99', print_text=True): 
+    if print_text:
+        print(f"Assistant: {text}")
     
     # Clean up the text and split it into individual sentences
     text = text.replace('\n', ' ')
@@ -450,6 +441,12 @@ def speak(text: str, speaker_id='en_99'):
                 sentence = sentence[:900]
                 
             try:
+                # Apply phonetic replacement before speaking so TTS says it right
+                actual = get_memory().get("user_name", "")
+                phonetic = get_memory().get("user_name_phonetic", "")
+                if actual and phonetic:
+                    sentence = re.sub(rf'\b{actual}\b', phonetic, sentence, flags=re.IGNORECASE)
+
                 # Generate audio for just this sentence
                 audio_tensor = tts_model.apply_tts(text=sentence, speaker=speaker_id, sample_rate=24000)
                 audio_array = audio_tensor.cpu().numpy()
@@ -499,6 +496,14 @@ async def main_loop():
         # Listen
         text = listen_auto()
         
+        # Process instant commands from the UI
+        if text.startswith("COMMAND:"):
+            cmd_body = text[8:]
+            if cmd_body.startswith("TEST_NAME:"):
+                test_name = cmd_body.split(":", 1)[1]
+                speak(f"Hello, {test_name}. It's nice to meet you!", print_text=False)
+            continue
+            
         if not text:
             continue
             
@@ -532,6 +537,23 @@ async def main_loop():
         # Remove the wake word (and optional greetings like "Hey") from the BEGINNING of the prompt so it doesn't pollute web searches.
         # We only remove it from the start so that queries like "Who was Queen Victoria?" still work!
         clean_prompt = re.sub(rf'(?i)^(?:hey\s+|hi\s+|hello\s+)?\b{wake_word}\b[,\s]*', '', text).strip()
+        
+        # Strip punctuation for strict trigger matching
+        clean_trigger = re.sub(r'[^\w\s]', '', clean_prompt).strip().lower()
+        
+        # Hardcoded trigger for Name Window
+        if clean_trigger == "change my name":
+            print("UI_PROMPT_NAME")
+            speak("I have opened a window for you to type your name.")
+            continue
+            
+        # Hardcoded trigger for Wake Word
+        wake_match = re.match(r"(?i)change (?:the|your) wake word to\s+(\w+)", clean_trigger)
+        if wake_match:
+            new_word = wake_match.group(1)
+            change_wake_word(new_word)
+            speak(f"Okay, my new wake word is {new_word}.")
+            continue
         
         # If the user only said the wake word and nothing else, we just skip (already handled greeting)
         if not clean_prompt:
