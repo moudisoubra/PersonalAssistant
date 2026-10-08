@@ -411,7 +411,7 @@ def speak(text: str, speaker_id='en_99'):
 # ==========================================
 async def main_loop():
     wake_word = "bob"
-    sleep_command = "stop"
+    sleep_command = "cease"
     timeout_seconds = 30  # Go back to sleep after 30 seconds of silence
     is_awake = False
     last_interaction_time = 0
