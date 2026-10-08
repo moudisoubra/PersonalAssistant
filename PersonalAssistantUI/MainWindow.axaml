@@ -1,0 +1,218 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PersonalAssistantUI.ViewModels"
+        x:Class="PersonalAssistantUI.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Width="450" Height="700"
+        Title="Personal Assistant"
+        Background="#0f0f15"
+        TransparencyLevelHint="Mica"
+        ExtendClientAreaToDecorationsHint="True"
+        PointerPressed="Window_PointerPressed">
+
+    <Window.Styles>
+        <!-- Talking: Glowing Pulsing Orb -->
+        <Style Selector="Ellipse.pulser">
+
+            <Style.Animations>
+                <Animation Duration="0:0:1.5" IterationCount="INFINITE" PlaybackDirection="Alternate">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Width" Value="100" />
+                        <Setter Property="Height" Value="100" />
+                        <Setter Property="Opacity" Value="0" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Width" Value="300" />
+                        <Setter Property="Height" Value="300" />
+                        <Setter Property="Opacity" Value="0.4" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+
+        <!-- Thinking: Scrolling Cyberpunk Gradient -->
+        <Style Selector="Border.scroller">
+            <Style.Animations>
+                <Animation Duration="0:0:3" IterationCount="INFINITE">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Canvas.Top" Value="0" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Canvas.Top" Value="-400" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        
+        <!-- Listening: Glowing Border -->
+        <Style Selector="Border.listener">
+            <Style.Animations>
+                <Animation Duration="0:0:1.5" IterationCount="INFINITE" PlaybackDirection="Alternate">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="BoxShadow" Value="0 0 10 2 #00BFFF" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="BoxShadow" Value="0 0 40 10 #00BFFF" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <!-- Custom Sleek ToggleButton for Mute -->
+        <Style Selector="ToggleButton.muteBtn">
+            <Setter Property="Background" Value="#331111" />
+            <Setter Property="Foreground" Value="#FF3333" />
+            <Setter Property="Padding" Value="15,8" />
+            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="FontWeight" Value="Black" />
+            <Setter Property="BorderBrush" Value="#FF3333" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+        <Style Selector="ToggleButton.muteBtn:checked">
+            <Setter Property="Background" Value="#113311" />
+            <Setter Property="Foreground" Value="#00FF7F" />
+            <Setter Property="BorderBrush" Value="#00FF7F" />
+        </Style>
+
+        <!-- Neon Volume Slider -->
+        <Style Selector="Slider.neonSlider">
+            <Setter Property="Foreground" Value="#00FF7F" />
+            <Setter Property="Background" Value="#222222" />
+        </Style>
+    </Window.Styles>
+
+    <Grid Background="Transparent">
+        <!-- BACKGROUND LAYER -->
+        <Grid>
+            <!-- Default Dark -->
+            <Border Background="#0f0f15" />
+            
+            <!-- Thinking Animation -->
+            <Canvas IsVisible="{Binding IsThinking}" Width="450" Height="700" ClipToBounds="True">
+                <!-- We make a border that is very tall and scroll it up -->
+                <Border Classes="scroller" Width="450" Height="1500" Background="Transparent">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                            <GradientStop Offset="0.0" Color="#0f0f15"/>
+                            <GradientStop Offset="0.1" Color="#4A235A"/>
+                            <GradientStop Offset="0.2" Color="#0f0f15"/>
+                            <GradientStop Offset="0.3" Color="#4A235A"/>
+                            <GradientStop Offset="0.4" Color="#0f0f15"/>
+                            <GradientStop Offset="0.5" Color="#4A235A"/>
+                            <GradientStop Offset="0.6" Color="#0f0f15"/>
+                            <GradientStop Offset="0.7" Color="#4A235A"/>
+                            <GradientStop Offset="0.8" Color="#0f0f15"/>
+                            <GradientStop Offset="0.9" Color="#4A235A"/>
+                            <GradientStop Offset="1.0" Color="#0f0f15"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Canvas>
+
+            <!-- Talking Animation -->
+            <Ellipse Classes="pulser" 
+                     IsVisible="{Binding IsTalking}" 
+                     Width="200" Height="200" 
+                     HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Ellipse.Fill>
+                    <RadialGradientBrush GradientOrigin="50%,50%" Center="50%,50%" RadiusX="0.5" RadiusY="0.5">
+                        <GradientStop Offset="0" Color="#00FF7F" />
+                        <GradientStop Offset="1" Color="Transparent" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+
+            <!-- Listening Animation -->
+            <Border Classes="listener" IsVisible="{Binding IsListening}" Margin="10" CornerRadius="10" BorderThickness="2" BorderBrush="#00BFFF" />
+        </Grid>
+
+        <!-- FOREGROUND UI -->
+        <Grid RowDefinitions="Auto,*,Auto,Auto,Auto" Margin="30,50,30,30" Background="Transparent">
+            <!-- Header -->
+            <Grid Grid.Row="0" Margin="0,0,0,30">
+                <TextBlock Text="{Binding WakeWord}" 
+                           FontSize="36" 
+                           FontWeight="Black" 
+                           Foreground="#00FF7F" 
+                           HorizontalAlignment="Center" 
+                           LetterSpacing="4"/>
+                           
+                <Button Content="?" 
+                        HorizontalAlignment="Right" 
+                        VerticalAlignment="Center" 
+                        Background="#3300FF7F" 
+                        Foreground="#00FF7F"
+                        CornerRadius="15"
+                        Width="30" Height="30"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        FontWeight="Bold"
+                        Cursor="Hand"
+                        Click="HelpButton_Click"
+                        ToolTip.Tip="What can I do?"/>
+            </Grid>
+                       
+            <!-- Assistant Output -->
+            <Border Grid.Row="1" Background="#88000000" CornerRadius="16" Padding="25">
+                <TextBlock Text="{Binding AssistantText}" 
+                           TextWrapping="Wrap"
+                           FontSize="22"
+                           FontWeight="Medium"
+                           Foreground="White"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"/>
+            </Border>
+
+            <!-- User Output -->
+            <Border Grid.Row="2" Background="#66000000" CornerRadius="16" Padding="20" Margin="0,30,0,30">
+                <StackPanel>
+                    <TextBlock Text="You said:" FontSize="12" FontWeight="SemiBold" Foreground="#888888" Margin="0,0,0,8"/>
+                    <TextBlock Text="{Binding UserText}" 
+                               TextWrapping="Wrap"
+                               FontSize="16"
+                               Foreground="#E0E0E0"/>
+                </StackPanel>
+            </Border>
+            
+            <!-- Status -->
+            <TextBlock Grid.Row="3" 
+                       Text="{Binding StatusText}" 
+                       FontSize="16" 
+                       FontWeight="SemiBold"
+                       FontStyle="Italic"
+                       Foreground="#00FF7F" 
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,20"/>
+                       
+            <!-- Controls Panel (Mute & Volume) -->
+            <Border Grid.Row="4" Background="#AA000000" CornerRadius="20" Padding="20,10">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    
+                    <ToggleButton Grid.Column="0" 
+                                  Classes="muteBtn" 
+                                  IsChecked="{Binding !IsMuted}" 
+                                  Cursor="Hand">
+                        <Panel>
+                            <TextBlock Text="MIC ON" IsVisible="{Binding !IsMuted}" Foreground="#00FF7F"/>
+                            <TextBlock Text="MUTED" IsVisible="{Binding IsMuted}" Foreground="#FF3333"/>
+                        </Panel>
+                    </ToggleButton>
+                    
+                    <Slider Grid.Column="1" 
+                            Classes="neonSlider" 
+                            Minimum="0" Maximum="2" 
+                            Value="{Binding Volume}" 
+                            Margin="20,0" 
+                            Cursor="Hand"
+                            VerticalAlignment="Center"/>
+                            
+                    <TextBlock Grid.Column="2" 
+                               Text="{Binding Volume, StringFormat=\{0:F1\}x}" 
+                               Foreground="#00FF7F" 
+                               FontWeight="Bold" 
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

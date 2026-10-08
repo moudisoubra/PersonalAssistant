@@ -18,6 +18,7 @@ import soundfile as sf
 import numpy as np
 import time
 import difflib
+import json
 from faster_whisper import WhisperModel
 from ddgs import DDGS
 from datetime import datetime
@@ -163,12 +164,64 @@ available_tools = {
     "list_my_playlists": spotify_tools.list_my_playlists,
     "what_is_playing": spotify_tools.what_is_playing,
     "like_current_song": spotify_tools.like_current_song,
-    "search_youtube": youtube_tools.search_youtube
+    "search_youtube": youtube_tools.search_youtube,
+    "change_wake_word": None # Will be mapped below
+}
+
+# ==========================================
+# MEMORY FUNCTIONS
+# ==========================================
+
+def get_memory():
+    try:
+        with open("memory.json", "r") as f:
+            return json.load(f)
+    except:
+        return {"wake_word": "bob"}
+
+def save_memory(mem):
+    with open("memory.json", "w") as f:
+        json.dump(mem, f)
+
+def change_wake_word(new_wake_word: str) -> str:
+    """Changes the wake word of the assistant."""
+    mem = get_memory()
+    mem["wake_word"] = new_wake_word.lower()
+    save_memory(mem)
+    print(f"UI_WAKE_WORD_CHANGED:{new_wake_word.upper()}")
+    return f"Successfully changed wake word to {new_wake_word}."
+
+available_tools["change_wake_word"] = change_wake_word
+
+change_wake_word_schema = {
+    "type": "function",
+    "function": {
+        "name": "change_wake_word",
+        "description": "Change the name or wake keyword that the user uses to wake you up. Use this when the user says something like 'change your name to X' or 'I want to call you X'.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "new_wake_word": {
+                    "type": "string", 
+                    "description": "The new name or wake word the user wants to use."
+                }
+            },
+            "required": ["new_wake_word"]
+        }
+    }
 }
 
 # ==========================================
 # CORE FUNCTIONS
 # ==========================================
+
+def get_shared_state():
+    try:
+        with open("shared_state.json", "r") as f:
+            return json.load(f)
+    except:
+        return {"mute": False, "volume": 1.0}
+
 def listen_auto(fs=16000, threshold=600, silence_duration=2.5):
     """Uses a gapless audio stream to monitor speech without tearing the waveform."""
     print("\nWaiting for you to speak...")
@@ -194,6 +247,15 @@ def listen_auto(fs=16000, threshold=600, silence_duration=2.5):
         while True:
             # Pull the next perfect chunk of audio from the queue
             chunk = audio_queue.get()
+            
+            # Check for MUTE state
+            state = get_shared_state()
+            if state.get("mute", False):
+                is_recording = False
+                recorded_frames = []
+                silent_chunks = 0
+                continue
+                
             volume = np.max(np.abs(chunk))
             
             if not is_recording:
@@ -239,6 +301,7 @@ conversation_history = []
 async def think(user_text: str):
     global conversation_history
     client = ollama.AsyncClient()
+    wake_word = get_memory().get("wake_word", "bob")
     
 # Build the fresh context with Time Awareness and Strict Search Rules
     current_date = datetime.now().strftime("%B %d, %Y")
@@ -246,7 +309,7 @@ async def think(user_text: str):
     messages = [{
         "role": "system", 
         "content": (
-            f"You are a highly intelligent conversational voice assistant. Today's date is {current_date}. "
+            f"You are a highly intelligent conversational voice assistant named {wake_word.capitalize()}. Today's date is {current_date}. "
             "Provide clear, natural-sounding spoken responses. Adapt your response length based on the user's prompt. "
             "CRITICAL TTS RULE: You MUST spell out ALL numbers, decimals, and dates as words (e.g., write 'twenty twenty-six' instead of '2026', 'thirteen point zero six' instead of '13.06', 'thirty' instead of '30') because the text-to-speech engine cannot read numerical digits. "
             "CRITICAL RULE: You have outdated training data. You MUST ALWAYS use the search_web tool "
@@ -278,7 +341,8 @@ async def think(user_text: str):
         spotify_tools.list_playlists_schema,
         spotify_tools.what_is_playing_schema,
         spotify_tools.like_song_schema,
-        youtube_tools.search_youtube_schema
+        youtube_tools.search_youtube_schema,
+        change_wake_word_schema
     ]
 
     response = await client.chat(
@@ -390,6 +454,11 @@ def speak(text: str, speaker_id='en_99'):
                 audio_tensor = tts_model.apply_tts(text=sentence, speaker=speaker_id, sample_rate=24000)
                 audio_array = audio_tensor.cpu().numpy()
                 
+                # Apply volume multiplier
+                state = get_shared_state()
+                vol = float(state.get("volume", 1.0))
+                audio_array = audio_array * vol
+                
                 sd.play(audio_array, samplerate=24000)
                 duration = len(audio_array) / 24000.0
                 start_time = time.time()
@@ -410,15 +479,18 @@ def speak(text: str, speaker_id='en_99'):
 # THE MASTER LOOP
 # ==========================================
 async def main_loop():
-    wake_word = "bob"
     sleep_command = "cease"
     timeout_seconds = 30  # Go back to sleep after 30 seconds of silence
     is_awake = False
     last_interaction_time = 0
 
+    wake_word = get_memory().get("wake_word", "bob")
     print(f"\nSystem Online! Waiting for wake word '{wake_word.capitalize()}'...")
     
     while True:
+        # Refresh memory dynamically
+        wake_word = get_memory().get("wake_word", "bob")
+        
         # Check if we should fall asleep due to timeout
         if is_awake and (time.time() - last_interaction_time > timeout_seconds):
             print(f"\nIt's been {timeout_seconds} seconds. Going back to sleep...")

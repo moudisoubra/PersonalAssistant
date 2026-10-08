@@ -1,0 +1,97 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PersonalAssistantUI.HelpWindow"
+        Title="Features Guide"
+        Width="600" Height="700"
+        Background="#0f0f15"
+        TransparencyLevelHint="Mica"
+        ExtendClientAreaToDecorationsHint="True"
+        WindowStartupLocation="CenterOwner"
+        PointerPressed="Window_PointerPressed">
+
+    <Grid RowDefinitions="Auto,*" Margin="20,40,20,20">
+        <!-- Header -->
+        <TextBlock Grid.Row="0" 
+                   Text="WHAT CAN I DO?" 
+                   FontSize="28" 
+                   FontWeight="Black" 
+                   Foreground="#00BFFF" 
+                   HorizontalAlignment="Center" 
+                   LetterSpacing="2"
+                   Margin="0,0,0,20"/>
+
+        <!-- Close Button -->
+        <Button Grid.Row="0" 
+                Content="X" 
+                HorizontalAlignment="Right" 
+                VerticalAlignment="Top" 
+                Background="Transparent"
+                Foreground="#888888"
+                FontSize="20"
+                FontWeight="Bold"
+                BorderThickness="0"
+                Click="Close_Click"
+                Cursor="Hand"/>
+
+        <!-- Capabilities List -->
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Spacing="15" Margin="0,0,15,0">
+                
+                <!-- Web Search -->
+                <Border Background="#22000000" CornerRadius="10" Padding="15">
+                    <StackPanel>
+                        <TextBlock Text="🌐 Web Search" FontWeight="Bold" FontSize="18" Foreground="#00FF7F" Margin="0,0,0,5"/>
+                        <TextBlock Text="I can browse the internet in real-time to answer questions, find facts, or get the latest news." TextWrapping="Wrap" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                        <TextBlock Text="Example: &quot;What's the weather like in Tokyo?&quot; or &quot;Who won the Superbowl this year?&quot;" FontStyle="Italic" TextWrapping="Wrap" Foreground="#888888"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Media Controls -->
+                <Border Background="#22000000" CornerRadius="10" Padding="15">
+                    <StackPanel>
+                        <TextBlock Text="⏯️ Media Controls" FontWeight="Bold" FontSize="18" Foreground="#00FF7F" Margin="0,0,0,5"/>
+                        <TextBlock Text="I can control media currently playing on your computer." TextWrapping="Wrap" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                        <TextBlock Text="Example: &quot;Pause the music&quot;, &quot;Skip this song&quot;, or &quot;Go back to the last track.&quot;" FontStyle="Italic" TextWrapping="Wrap" Foreground="#888888"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Spotify Control -->
+                <Border Background="#22000000" CornerRadius="10" Padding="15">
+                    <StackPanel>
+                        <TextBlock Text="🎵 Spotify Integration" FontWeight="Bold" FontSize="18" Foreground="#00FF7F" Margin="0,0,0,5"/>
+                        <TextBlock Text="I am fully connected to your Spotify account. I can play songs, list your playlists, and manage your library." TextWrapping="Wrap" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                        <TextBlock Text="Example: &quot;Play Blinding Lights by The Weeknd&quot;, &quot;What song is playing right now?&quot;, &quot;Add this to my liked songs&quot;, or &quot;Read out my playlists.&quot;" FontStyle="Italic" TextWrapping="Wrap" Foreground="#888888"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- YouTube Search -->
+                <Border Background="#22000000" CornerRadius="10" Padding="15">
+                    <StackPanel>
+                        <TextBlock Text="📺 YouTube Search" FontWeight="Bold" FontSize="18" Foreground="#00FF7F" Margin="0,0,0,5"/>
+                        <TextBlock Text="I can automatically open your browser and search YouTube for videos." TextWrapping="Wrap" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                        <TextBlock Text="Example: &quot;Search YouTube for funny cat videos&quot; or &quot;Look up the latest tech reviews on YouTube.&quot;" FontStyle="Italic" TextWrapping="Wrap" Foreground="#888888"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Change Wake Word -->
+                <Border Background="#22000000" CornerRadius="10" Padding="15">
+                    <StackPanel>
+                        <TextBlock Text="🧠 Identity &amp; Memory" FontWeight="Bold" FontSize="18" Foreground="#00FF7F" Margin="0,0,0,5"/>
+                        <TextBlock Text="You can rename me whenever you want, and I will remember it forever." TextWrapping="Wrap" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                        <TextBlock Text="Example: &quot;Change your wake word to Victoria&quot; or &quot;I want to call you Jarvis now.&quot;" FontStyle="Italic" TextWrapping="Wrap" Foreground="#888888"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- General Conversation -->
+                <Border Background="#22000000" CornerRadius="10" Padding="15">
+                    <StackPanel>
+                        <TextBlock Text="💬 Casual Conversation" FontWeight="Bold" FontSize="18" Foreground="#00FF7F" Margin="0,0,0,5"/>
+                        <TextBlock Text="I am powered by an advanced LLM. You can just talk to me about anything, ask for advice, or tell me to sleep if you want me to stop listening." TextWrapping="Wrap" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                        <TextBlock Text="Example: &quot;Hey, how are you doing today?&quot; or &quot;Cease and go to sleep.&quot;" FontStyle="Italic" TextWrapping="Wrap" Foreground="#888888"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>
